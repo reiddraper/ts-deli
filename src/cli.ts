@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import * as deli from './deli'
 
 function logNowAndThread(msg: string, simulation: deli.Deli): void {
