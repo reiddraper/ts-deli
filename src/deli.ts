@@ -53,8 +53,6 @@ export class Deli {
       reason: WakeupReason.Fork
     })
 
-    this.debug()
-
     await promise
     return threadId
   }
@@ -81,7 +79,6 @@ export class Deli {
   async run(func: (deli: Deli) => Promise<void>): Promise<void> {
     func(this)
     while (this.scheduled.length() > 0) {
-      this.debug()
       await this.next()
     }
   }

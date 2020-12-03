@@ -3,7 +3,6 @@ export declare class Deli {
     private nextThreadId;
     currentlyRunningThreadId: number;
     private scheduled;
-    debug(): void;
     next(): Promise<void>;
     fork(func: () => Promise<void>): Promise<number>;
     sleep(duration: number): Promise<void>;
