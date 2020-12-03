@@ -1,4 +1,4 @@
-import * as pqueue from './priority-queue'
+import * as pqueue from './data/priority-queue'
 
 enum WakeupReason {
   Sleep = 'Sleep',

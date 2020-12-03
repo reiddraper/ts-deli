@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-cli = require('../lib/cli.js')
+example = require('../lib/example.js')
 
-cli.run()
+example.run()
