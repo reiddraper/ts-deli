@@ -79,7 +79,7 @@ test('The runtime of several sleeping threads is only as long as the longest sin
           arr.reduce((a, b) => a + b, 0)
         )
         const maxSleep = Math.max(...sleepLengthofEachThread, 0)
-        expect(simulation.now).toEqual(maxSleep)
+        expect(simulation.endTime).toEqual(maxSleep)
       }
     ),
     {numRuns: 4000}

@@ -1,6 +1,7 @@
+import {Concurrent} from './control/concurrent'
 import * as deli from './deli'
 
-function logNowAndThread(msg: string, simulation: deli.Deli): void {
+function logNowAndThread(msg: string, simulation: Concurrent): void {
   console.log(
     `${msg} threadId=${simulation.currentlyRunningThreadId} now=${simulation.now}`
   )
