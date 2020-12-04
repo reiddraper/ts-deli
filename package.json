@@ -1,5 +1,5 @@
 {
-  "name": "ts-deli",
+  "name": "@reiddraper/deli",
   "version": "0.0.1",
   "description": "",
   "main": "lib/index.js",
@@ -28,5 +28,9 @@
     "prettier": "^2.1.2",
     "ts-jest": "^26.4.4",
     "typescript": "^4.0.5"
+  },
+  "dependencies": {
+    "pure-rand": "^4.1.1",
+    "tdigest": "^0.1.1"
   }
 }
