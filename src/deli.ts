@@ -5,7 +5,7 @@ export class Deli {
   async run(
     func: (conc: concurrent.Concurrent) => Promise<void>
   ): Promise<void> {
-    const conc = new concurrent.Concurrent()
+    const conc = new concurrent.ContinuationConcurrent()
     await conc.run(func)
     this.endTime = conc.now
   }

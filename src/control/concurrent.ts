@@ -11,14 +11,21 @@ type Thread = {
   promise?: Promise<void>
   reason: WakeupReason
 }
-export class Concurrent {
+
+export interface Concurrent {
+  now: number
+  currentlyRunningThreadId: number
+  fork(func: () => Promise<void>): Promise<number>
+  sleep(duration: number): Promise<void>
+}
+export class ContinuationConcurrent {
   now: number = 0
   private nextThreadId: number = 0
   // TODO: extract this into a function or better named variable?
   currentlyRunningThreadId: number = 0
   private scheduled: pqueue.PriorityQueue<Thread> = new pqueue.PriorityQueue()
 
-  async next(): Promise<void> {
+  private async next(): Promise<void> {
     const nextThread = this.scheduled.pop()
     if (nextThread === undefined) {
       return
