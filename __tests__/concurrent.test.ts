@@ -113,7 +113,7 @@ test('Two threads are able to swap back and forth using channels', async () => {
   )
 })
 
-test('For all buffer sizes, worker counts, and jobs tasks, we eventually complete each task (sleep)', async () => {
+test('One writer, many readers', async () => {
   await fc.assert(
     fc.asyncProperty(
       fc.integer(0, 32),
@@ -141,6 +141,39 @@ test('For all buffer sizes, worker counts, and jobs tasks, we eventually complet
           }
         })
         expect(counter).toEqual(sleeps.length)
+      }
+    ),
+    {numRuns: 1024}
+  )
+})
+
+test('One reader, many writers', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      fc.integer(0, 32),
+      fc.integer(1, 32), // need at least one writing thread
+      fc.array(fc.integer(0, 1024)),
+      async (bufferSize, numThreads, sleeps) => {
+        let counter = 0
+        const simulation = new concurrent.ContinuationConcurrent()
+        await simulation.run(async () => {
+          const channel: concurrent.Channel<number> = simulation.createChannel(
+            bufferSize
+          )
+          for (const _ of range(0, numThreads)) {
+            await simulation.fork(async () => {
+              for (const sleepTime of sleeps) {
+                await simulation.writeChannel(channel, sleepTime)
+              }
+            })
+          }
+          while (true) {
+            const sleepTime = await simulation.readChannel(channel)
+            await simulation.sleep(sleepTime)
+            counter++
+          }
+        })
+        expect(counter).toEqual(sleeps.length * numThreads)
       }
     ),
     {numRuns: 256}
