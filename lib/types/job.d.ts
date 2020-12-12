@@ -3,5 +3,5 @@ export interface JobTiming {
     duration: number;
 }
 export interface RunJob {
-    runJob(job: JobTiming): Promise<void>;
+    runJob(): Promise<void>;
 }

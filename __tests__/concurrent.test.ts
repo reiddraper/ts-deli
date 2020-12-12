@@ -179,3 +179,24 @@ test('One reader, many writers', async () => {
     {numRuns: 256}
   )
 })
+
+test('Each thread always returns its correct thread identifier', async () => {
+  await fc.assert(
+    fc.asyncProperty(fc.integer(1, 64), async totalThreadCount => {
+      const simulation = new concurrent.ContinuationConcurrent()
+      let correctThread = true
+      await simulation.run(async function (sim) {
+        for (const threadNumber of range(0, totalThreadCount)) {
+          await sim.fork(async () => {
+            await sim.sleep(threadNumber)
+            if (sim.currentlyRunningThreadId !== threadNumber + 1) {
+              correctThread = false
+            }
+          })
+        }
+      })
+      expect(correctThread).toEqual(true)
+    }),
+    {numRuns: 128}
+  )
+})

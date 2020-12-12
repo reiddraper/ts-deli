@@ -4,4 +4,8 @@ declare module 'tdigest' {
     compress: void
     percentile(percentile: number): number
   }
+
+  export interface TDigestReadOnly {
+    percentile(percentile: number): number
+  }
 }
