@@ -197,6 +197,6 @@ test('Each thread always returns its correct thread identifier', async () => {
       })
       expect(correctThread).toEqual(true)
     }),
-    {numRuns: 128}
+    {numRuns: 512}
   )
 })
