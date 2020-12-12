@@ -77,11 +77,6 @@ export class ContinuationConcurrent {
       return
     } else {
       const [newNow, thread] = nextThread
-      /*
-      console.log(
-        `**** Next: Time ${this.now}, about to run ${thread.threadId} for reason ${thread.reason}`
-      )
-      */
       this.now = newNow
       this.currentlyRunningThreadId = thread.threadId
 
@@ -97,7 +92,6 @@ export class ContinuationConcurrent {
 
       thread.resolve()
       await promise
-      //console.log(`At the end of next, time is now ${this.now}`)
     }
   }
 
