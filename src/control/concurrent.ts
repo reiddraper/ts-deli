@@ -281,10 +281,7 @@ export class ContinuationConcurrent {
     funcWithClearedRunning()
 
     while (this.scheduled.length() > 0) {
-      while (this.scheduled.length() > 0) {
-        await this.next()
-      }
-      //await Promise.all(this.stillRunning.values())
+      await this.next()
     }
   }
 }
