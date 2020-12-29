@@ -4,6 +4,8 @@ import { JobTiming, RunJob } from './types/job';
 export { Concurrent, Channel } from './control/concurrent';
 export { JobTiming, RunJob } from './types/job';
 export * from 'tdigest';
+export * as random from './random';
+export * as generator from './utils/generator';
 export declare class Deli {
     endTime?: number;
     private sojournStats;

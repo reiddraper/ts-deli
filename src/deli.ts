@@ -7,6 +7,9 @@ export {Concurrent, Channel} from './control/concurrent'
 export {JobTiming, RunJob} from './types/job'
 export * from 'tdigest'
 
+export * as random from './random'
+export * as generator from './utils/generator'
+
 export class Deli {
   endTime?: number
   private sojournStats: tdigest.TDigest = new tdigest.TDigest()
@@ -43,12 +46,9 @@ export class Deli {
       this.perfectStats.push(j.duration)
     }
 
-    const runnableJobs: Generator<JobTiming & RunJob> = generator.map(
-      jobs,
-      j => {
-        return {...j, ...{runJob: async () => performJob(j)}}
-      }
-    )
+    const runnableJobs: Generator<JobTiming & RunJob> = generator.map(j => {
+      return {...j, ...{runJob: async () => performJob(j)}}
+    }, jobs)
 
     await conc.run(async (sim: concurrent.Concurrent) => {
       const channel: concurrent.Channel<

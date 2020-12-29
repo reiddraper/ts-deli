@@ -28,11 +28,10 @@ type ChannelInternals<T> = {
   writers: Thread[]
 }
 
-interface ResolveablePromise {
+interface ResolvablePromise {
   promise: Promise<void>
   resolve: () => void
 }
-
 export interface Concurrent {
   // basic concurrency support
   now: number
@@ -59,7 +58,7 @@ export class ContinuationConcurrent {
   // Record<Channel<T>, ChannelInternals<T>>
   private channelAndWaiters: Record<any, any> = {}
 
-  private stillRunning: Map<number, ResolveablePromise> = new Map()
+  private stillRunning: Map<number, ResolvablePromise> = new Map()
 
   clearThreadWaitingPromise(): void {
     if (this.stillRunning.has(this.currentlyRunningThreadId)) {
@@ -81,14 +80,13 @@ export class ContinuationConcurrent {
       this.currentlyRunningThreadId = thread.threadId
 
       const resolveReceiver: Record<string, () => void> = {}
-      const promise = new Promise(resolve => {
+      const promise: Promise<void> = new Promise(resolve => {
         resolveReceiver['resolve'] = resolve
       })
-      const promiseTillNextYield = {
-        promise: promise as Promise<void>,
+      this.stillRunning.set(thread.threadId, {
+        promise,
         resolve: resolveReceiver['resolve']
-      }
-      this.stillRunning.set(thread.threadId, promiseTillNextYield)
+      })
 
       thread.resolve()
       await promise
@@ -107,13 +105,13 @@ export class ContinuationConcurrent {
     }
 
     const resolveReceiver: Record<string, () => void> = {}
-    const promise = new Promise(resolve => {
+    const promise: Promise<void> = new Promise(resolve => {
       resolveReceiver['resolve'] = resolve
     })
     this.scheduled.insert(this.now, {
       threadId: this.currentlyRunningThreadId,
       resolve: resolveReceiver['resolve'],
-      promise: promise as Promise<void>,
+      promise,
       reason: WakeupReason.ForkYield
     })
     this.scheduled.insert(this.now, {
@@ -132,14 +130,14 @@ export class ContinuationConcurrent {
     const when = this.now + duration
 
     const resolveReceiver: Record<string, () => void> = {}
-    const promise = new Promise(resolve => {
+    const promise: Promise<void> = new Promise(resolve => {
       resolveReceiver['resolve'] = resolve
     })
 
     this.scheduled.insert(when, {
       threadId: this.currentlyRunningThreadId,
       resolve: resolveReceiver['resolve'],
-      promise: promise as Promise<void>,
+      promise,
       reason: WakeupReason.Sleep
     })
 
@@ -167,13 +165,13 @@ export class ContinuationConcurrent {
 
     if (channelInternals.contents.length === 0) {
       const resolveReceiver: Record<string, () => void> = {}
-      const promise = new Promise(resolve => {
+      const promise: Promise<void> = new Promise(resolve => {
         resolveReceiver['resolve'] = resolve
       })
       const thread = {
         threadId: this.currentlyRunningThreadId,
         resolve: resolveReceiver['resolve'],
-        promise: promise as Promise<void>,
+        promise,
         reason: WakeupReason.ChannelReadReady
       }
       channelInternals.readers.push(thread)
@@ -197,13 +195,13 @@ export class ContinuationConcurrent {
       }
 
       const resolveReceiver: Record<string, () => void> = {}
-      const promise = new Promise(resolve => {
+      const promise: Promise<void> = new Promise(resolve => {
         resolveReceiver['resolve'] = resolve
       })
       const myThread = {
         threadId: this.currentlyRunningThreadId,
         resolve: resolveReceiver['resolve'],
-        promise: promise as Promise<void>,
+        promise,
         reason: WakeupReason.ReadYield
       }
       this.scheduled.insert(this.now, myThread)
@@ -225,13 +223,13 @@ export class ContinuationConcurrent {
       channelInternals.readers.length === 0
     ) {
       const resolveReceiver: Record<string, () => void> = {}
-      const promise = new Promise(resolve => {
+      const promise: Promise<void> = new Promise(resolve => {
         resolveReceiver['resolve'] = resolve
       })
       const thread = {
         threadId: this.currentlyRunningThreadId,
         resolve: resolveReceiver['resolve'],
-        promise: promise as Promise<void>,
+        promise,
         reason: WakeupReason.ChannelWriteReady
       }
       channelInternals.writers.push(thread)
@@ -258,13 +256,13 @@ export class ContinuationConcurrent {
     // reader has actually read the value, which is
     // part of the correctness for buffered channels
     const resolveReceiver: Record<string, () => void> = {}
-    const promise = new Promise(resolve => {
+    const promise: Promise<void> = new Promise(resolve => {
       resolveReceiver['resolve'] = resolve
     })
     const thread = {
       threadId: this.currentlyRunningThreadId,
       resolve: resolveReceiver['resolve'],
-      promise: promise as Promise<void>,
+      promise,
       reason: WakeupReason.WriteYield
     }
     this.scheduled.insert(this.now, thread)

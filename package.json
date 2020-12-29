@@ -2,8 +2,8 @@
   "name": "@reiddraper/deli",
   "version": "0.0.1",
   "description": "",
-  "main": "lib/index.js",
-  "typings": "lib/main.d.ts",
+  "main": "lib/deli.js",
+  "typings": "lib/deli.d.ts",
   "bin": {
     "deli-example": "bin/deli-example"
   },
