@@ -39,11 +39,14 @@
       "@typescript-eslint/promise-function-async": "error",
       "@typescript-eslint/require-array-sort-compare": "error",
       "@typescript-eslint/restrict-plus-operands": "error",
+      "@typescript-eslint/no-shadow": "error",
       "semi": "off",
       "@typescript-eslint/semi": ["error", "never"],
       "@typescript-eslint/type-annotation-spacing": "error",
       "@typescript-eslint/unbound-method": "error",
-      "github/no-then": "off"
+      "github/no-then": "off",
+      "no-undef": "off",
+      "no-shadow": "off"
     },
     "env": {
       "node": true,

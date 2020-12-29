@@ -17,6 +17,9 @@ type Thread = {
   reason: WakeupReason
 }
 
+// Disabling this on purpose because this is
+// a Phantom Type
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export type Channel<T> = {
   id: number
   size?: number
