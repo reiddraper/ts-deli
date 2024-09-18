@@ -1,3 +1,8 @@
+export function* constant<T>(value: T): Generator<T> {
+  while (true) {
+    yield value
+  }
+}
 export function* map<A, B>(
   mapper: (val: A) => B,
   generator: Generator<A> | A[]
@@ -73,6 +78,14 @@ export function* scan<A>(
         applied = fn(applied, val)
         yield applied
       }
+    }
+  }
+}
+
+export function* repeat<A>(items: Generator<A>, count: number): Generator<A> {
+  for (const item of items) {
+    for (let i = 0; i < count; i++) {
+      yield item
     }
   }
 }
