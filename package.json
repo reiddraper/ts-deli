@@ -4,6 +4,10 @@
   "description": "",
   "main": "lib/deli.js",
   "typings": "lib/deli.d.ts",
+  "files": [
+    "lib",
+    "bin"
+  ],
   "bin": {
     "deli-example": "bin/deli-example"
   },
@@ -13,6 +17,7 @@
     "format-check": "prettier --check **/*.ts",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
+    "prepublishOnly": "npm run build",
     "all": "npm run build && npm run format && npm run lint && npm test"
   },
   "author": "",

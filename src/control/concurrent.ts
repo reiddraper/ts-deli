@@ -53,10 +53,10 @@ export class ContinuationConcurrent {
   private nextChannelId: number = 0
 
   private scheduled: pqueue.PriorityQueue<Thread> = new pqueue.PriorityQueue()
-  // we have to 'cast up' to `any` here, as we allow channels to be created with
-  // different `T` values, and so there is no single `T` to use here for:
-  // Record<Channel<T>, ChannelInternals<T>>
-  private channelAndWaiters: Record<any, any> = {}
+  // Keyed by `chan.id`. The value type erases `T` because a single simulation
+  // can create channels with different element types; each `read/writeChannel`
+  // narrows back via the `Channel<T>` argument.
+  private channelAndWaiters: Map<number, ChannelInternals<unknown>> = new Map()
 
   private stillRunning: Map<number, ResolvablePromise> = new Map()
 
@@ -94,21 +94,30 @@ export class ContinuationConcurrent {
     const threadId = this.nextThreadId
 
     const funcWithClearedRunning = async (): Promise<void> => {
-      await func()
-      this.clearThreadWaitingPromise()
+      try {
+        await func()
+      } catch {
+        // Forked threads are detached; swallow exceptions so the scheduler
+        // doesn't hang and Node doesn't crash on unhandled rejection. Users
+        // who want to observe exceptions should catch inside their fork.
+      } finally {
+        this.clearThreadWaitingPromise()
+      }
     }
 
     const rPromise = resolvablePromise()
+    // Schedule child before parent (Haskell ifork semantics): the child runs
+    // first up to its first await, then the parent continues past `fork`.
+    this.scheduled.insert(this.now, {
+      threadId,
+      resolve: funcWithClearedRunning,
+      reason: WakeupReason.Fork
+    })
     this.scheduled.insert(this.now, {
       threadId: this.currentlyRunningThreadId,
       resolve: rPromise.resolve,
       promise: rPromise.promise,
       reason: WakeupReason.ForkYield
-    })
-    this.scheduled.insert(this.now, {
-      threadId,
-      resolve: funcWithClearedRunning,
-      reason: WakeupReason.Fork
     })
 
     await rPromise.promise
@@ -118,7 +127,8 @@ export class ContinuationConcurrent {
   async sleep(duration: number): Promise<void> {
     this.clearThreadWaitingPromise()
 
-    const when = this.now + duration
+    // Mirror Haskell's `max time currentNow` — never schedule into the past.
+    const when = this.now + Math.max(0, duration)
 
     const rPromise = resolvablePromise()
 
@@ -138,18 +148,18 @@ export class ContinuationConcurrent {
 
     const channel: Channel<T> = {id: channelId, size}
 
-    this.channelAndWaiters[channel as any] = {
+    this.channelAndWaiters.set(channelId, {
       contents: [],
       readers: [],
       writers: []
-    }
+    })
     return channel
   }
 
   async readChannel<T>(chan: Channel<T>): Promise<T> {
-    const channelInternals: ChannelInternals<T> = this.channelAndWaiters[
-      chan as any
-    ]
+    const channelInternals = this.channelAndWaiters.get(
+      chan.id
+    ) as ChannelInternals<T>
 
     if (channelInternals.contents.length === 0) {
       const rPromise = resolvablePromise()
@@ -196,9 +206,9 @@ export class ContinuationConcurrent {
   }
 
   async writeChannel<T>(chan: Channel<T>, item: T): Promise<void> {
-    const channelInternals: ChannelInternals<T> = this.channelAndWaiters[
-      chan as any
-    ]
+    const channelInternals = this.channelAndWaiters.get(
+      chan.id
+    ) as ChannelInternals<T>
 
     if (
       chan.size !== undefined &&
@@ -248,15 +258,25 @@ export class ContinuationConcurrent {
   }
 
   async run(func: (concurrent: Concurrent) => Promise<void>): Promise<void> {
-    const funcWithClearedRunning = async (): Promise<void> => {
-      await func(this)
-      this.clearThreadWaitingPromise()
-    }
-
-    funcWithClearedRunning()
+    let captured: {error: unknown} | undefined
+      // Discard the returned promise. We can't `await` it: if `func` parks
+      // indefinitely (e.g., reads from a never-written channel), awaiting
+      // would hang. The catch synchronously sets `captured` before
+      // clearThreadWaitingPromise releases the scheduler, so by the time the
+      // dispatch loop exits, any thrown error is already visible.
+    ;(async (): Promise<void> => {
+      try {
+        await func(this)
+      } catch (e) {
+        captured = {error: e}
+      } finally {
+        this.clearThreadWaitingPromise()
+      }
+    })()
 
     while (this.scheduled.length() > 0) {
       await this.next()
     }
+    if (captured !== undefined) throw captured.error
   }
 }

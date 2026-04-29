@@ -16,7 +16,12 @@ function exponentialQuantile(
   rate: number
 ): [number, RandomGenerator] {
   const [nInt, nextState] = gen.next()
-  const nFloat = (nInt + gen.min()) / (gen.min() + gen.max())
+  // Map uniformly into [0, 1): use `range + 1` as the divisor so that the
+  // largest possible `nInt` (== gen.max()) cannot produce u == 1, which
+  // would feed `Math.log(0) = -Infinity` and yield +Infinity from the
+  // quantile function.
+  const range = gen.max() - gen.min() + 1
+  const nFloat = (nInt - gen.min()) / range
   const value = -Math.log(1.0 - nFloat) / rate
   return [value, nextState]
 }

@@ -13,14 +13,12 @@ export function* map<A, B>(
 }
 
 export function* take<A>(count: number, generator: Generator<A>): Generator<A> {
+  if (count <= 0) return
   let i = 0
   for (const val of generator) {
-    if (i < count) {
-      yield val
-      i++
-    } else {
-      return
-    }
+    yield val
+    i++
+    if (i >= count) return
   }
 }
 
