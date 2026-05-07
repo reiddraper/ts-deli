@@ -42,7 +42,15 @@ export interface Concurrent {
   // channels
   createChannel<T>(size?: number): Channel<T>
   readChannel<T>(chan: Channel<T>): Promise<T>
+  // Non-blocking read: resolves to the next item if one is available, or to
+  // `undefined` if the channel is currently empty. Does not park the caller.
+  // Callers that loop on this must arrange to block somewhere (e.g. fall back
+  // to readChannel) or they will busy-loop in zero simulated time.
+  readChannelNonblocking<T>(chan: Channel<T>): Promise<T | undefined>
   writeChannel<T>(chan: Channel<T>, item: T): Promise<void>
+  // Non-blocking write: returns true if the item was accepted, false if the
+  // channel was bounded-and-full with no waiting readers. Never parks.
+  writeChannelNonblocking<T>(chan: Channel<T>, item: T): Promise<boolean>
 }
 export class ContinuationConcurrent {
   now: number = 0
@@ -255,6 +263,76 @@ export class ContinuationConcurrent {
     this.scheduled.insert(this.now, thread)
     this.clearThreadWaitingPromise()
     await rPromise.promise
+  }
+
+  async readChannelNonblocking<T>(chan: Channel<T>): Promise<T | undefined> {
+    const channelInternals = this.channelAndWaiters.get(
+      chan.id
+    ) as ChannelInternals<T>
+
+    if (channelInternals.contents.length === 0) {
+      return undefined
+    }
+
+    // Same wake/yield dance as readChannel's success path: we just freed a
+    // slot, so unpark a waiting writer (if any), then yield once so other
+    // ready threads at `now` can run before we proceed.
+    if (channelInternals.writers.length > 0) {
+      const nextWriter = channelInternals.writers.shift()!
+      this.scheduled.insert(this.now, nextWriter)
+    }
+
+    const rPromise = resolvablePromise()
+    const myThread = {
+      threadId: this.currentlyRunningThreadId,
+      resolve: rPromise.resolve,
+      promise: rPromise.promise,
+      reason: WakeupReason.ReadYield
+    }
+    this.scheduled.insert(this.now, myThread)
+    const item = channelInternals.contents.shift()
+    this.clearThreadWaitingPromise()
+    await rPromise.promise
+    return item as T
+  }
+
+  async writeChannelNonblocking<T>(
+    chan: Channel<T>,
+    item: T
+  ): Promise<boolean> {
+    const channelInternals = this.channelAndWaiters.get(
+      chan.id
+    ) as ChannelInternals<T>
+
+    if (
+      chan.size !== undefined &&
+      channelInternals.contents.length >= chan.size &&
+      channelInternals.readers.length === 0
+    ) {
+      return false
+    }
+
+    channelInternals.contents.push(item)
+
+    if (channelInternals.readers.length > 0) {
+      const nextReader = channelInternals.readers.shift()!
+      this.scheduled.insert(this.now, nextReader)
+    }
+
+    // Yield, mirroring writeChannel: ensures any reader we just woke gets
+    // to run before we continue, and that buffered-channel correctness
+    // (reader has actually consumed) holds.
+    const rPromise = resolvablePromise()
+    const thread = {
+      threadId: this.currentlyRunningThreadId,
+      resolve: rPromise.resolve,
+      promise: rPromise.promise,
+      reason: WakeupReason.WriteYield
+    }
+    this.scheduled.insert(this.now, thread)
+    this.clearThreadWaitingPromise()
+    await rPromise.promise
+    return true
   }
 
   async run(func: (concurrent: Concurrent) => Promise<void>): Promise<void> {

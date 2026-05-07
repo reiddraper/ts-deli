@@ -9,7 +9,8 @@
     "bin"
   ],
   "bin": {
-    "deli-example": "bin/deli-example"
+    "deli-example": "bin/deli-example",
+    "deli-tutorial": "bin/deli-tutorial"
   },
   "scripts": {
     "build": "tsc --declaration",

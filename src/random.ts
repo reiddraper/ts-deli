@@ -50,3 +50,36 @@ export function* uniform(
     yield scale(min, max, n)
   }
 }
+
+function paretoQuantile(
+  gen: RandomGenerator,
+  alpha: number,
+  xm: number
+): [number, RandomGenerator] {
+  const [nInt, nextState] = gen.next()
+  // Map uniformly into [0, 1): same `range + 1` trick as exponentialQuantile
+  // so u==1 cannot occur (which would feed Math.pow(0, ...)==0 and yield
+  // Infinity from the quantile).
+  const range = gen.max() - gen.min() + 1
+  const nFloat = (nInt - gen.min()) / range
+  const value = xm / Math.pow(1.0 - nFloat, 1.0 / alpha)
+  return [value, nextState]
+}
+
+// Pareto Type I, parameterized by mean (1.16 default for α matches the
+// Haskell Deli.Random.durationParetoDistribution). Mean exists for α > 1;
+// variance is infinite for α ≤ 2 (true at α=1.16) — that heavy tail is the
+// whole reason this distribution is interesting for queueing models.
+export function* pareto(
+  gen: RandomGenerator,
+  mean: number,
+  alpha = 1.16
+): Generator<number> {
+  const xm = (mean * (alpha - 1)) / alpha
+  let [n, nextState] = paretoQuantile(gen, alpha, xm)
+  yield n
+  while (true) {
+    ;[n, nextState] = paretoQuantile(nextState, alpha, xm)
+    yield n
+  }
+}

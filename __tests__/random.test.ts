@@ -1,7 +1,7 @@
 import * as fc from 'fast-check'
 import * as prand from 'pure-rand'
 import {RandomGenerator} from 'pure-rand'
-import {exponential} from '../src/random'
+import {exponential, pareto} from '../src/random'
 
 function takeN<T>(g: Generator<T>, n: number): T[] {
   const out: T[] = []
@@ -60,6 +60,43 @@ test('exponential is finite when source RNG saturates at max value', () => {
   const g = exponential(saturated, 1)
   const v = g.next()
   expect(Number.isFinite(v.value as number)).toBe(true)
+})
+
+test('pareto is deterministic for a given seed', () => {
+  const a = takeN(pareto(prand.mersenne(42), 0.003), 100)
+  const b = takeN(pareto(prand.mersenne(42), 0.003), 100)
+  expect(a).toEqual(b)
+})
+
+test('pareto values are bounded below by xm = mean·(α-1)/α', () => {
+  const mean = 0.003
+  const alpha = 1.16
+  const xm = (mean * (alpha - 1)) / alpha
+  const g = pareto(prand.mersenne(7), mean, alpha)
+  for (const s of takeN(g, 1000)) {
+    expect(s).toBeGreaterThanOrEqual(xm)
+  }
+})
+
+test('pareto sample mean approximates the configured mean for large N', () => {
+  // α=1.16 has infinite variance, so the sample mean converges slowly. Use
+  // a large N and a generous tolerance — the goal is to catch off-by-an-α
+  // bugs in the xm derivation, not to certify CLT-tight convergence.
+  const mean = 0.01
+  const N = 100_000
+  const samples = takeN(pareto(prand.mersenne(2024), mean, 1.16), N)
+  const observed = samples.reduce((a, b) => a + b, 0) / samples.length
+  expect(Math.abs(observed - mean) / mean).toBeLessThan(0.5)
+})
+
+test('pareto produces a heavy tail: max sample is many multiples of the mean', () => {
+  // With α=1.16, the maximum of N samples grows as ~N^(1/α). For N=10k
+  // we expect the max to be at least ~30× the mean. If the max is close
+  // to the mean, the implementation has lost the tail.
+  const mean = 0.003
+  const samples = takeN(pareto(prand.mersenne(99), mean, 1.16), 10_000)
+  const max = Math.max(...samples)
+  expect(max / mean).toBeGreaterThan(20)
 })
 
 test('exponential is correct under a non-zero-min RNG', () => {

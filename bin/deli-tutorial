@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+tutorial = require('../lib/tutorial.js')
+
+tutorial.run()

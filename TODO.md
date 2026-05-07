@@ -37,10 +37,6 @@ Items noticed during the property-test pass that weren't fixed in scope.
   producer thread, which is functionally equivalent but slower.
 - **`yield`.** Haskell's `yield` advances the clock by 1µs to model a CPU
   cycle. Not present in TS.
-- **`readChannelNonblocking` / `writeChannelNonblocking`.** Both exist in
-  Haskell, neither in TS.
-- **Pareto duration distribution.** Haskell ships exponential + pareto; TS
-  ships only exponential.
 - **Per-minute temporal stats.** Haskell's `DeliState.temporalStats` keeps a
   rolling per-minute response-time digest; TS keeps only the global digests.
 - **`priority` (SRTF).** Haskell exposes a priority function for shortest-

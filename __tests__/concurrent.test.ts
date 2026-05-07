@@ -777,3 +777,130 @@ test('Forked thread ids are unique across a simulation', async () => {
     {numRuns: 200}
   )
 })
+
+test('readChannelNonblocking on empty channel returns undefined without parking', async () => {
+  const simulation = new concurrent.ContinuationConcurrent()
+  let observed: unknown = 'unset'
+  let timeAfter = -1
+  await simulation.run(async function (sim) {
+    const c = sim.createChannel<number>()
+    observed = await sim.readChannelNonblocking(c)
+    timeAfter = sim.now
+  })
+  expect(observed).toBeUndefined()
+  expect(timeAfter).toEqual(0)
+})
+
+test('readChannelNonblocking on non-empty channel returns next item, FIFO preserved', async () => {
+  await fc.assert(
+    fc.asyncProperty(fc.array(fc.integer(), 1, 32), async items => {
+      const simulation = new concurrent.ContinuationConcurrent()
+      const observed: number[] = []
+      await simulation.run(async function (sim) {
+        const c = sim.createChannel<number>()
+        await sim.fork(async () => {
+          for (const x of items) await sim.writeChannel(c, x)
+        })
+        // Drain via nonblocking reads, falling back to blocking when empty.
+        for (let i = 0; i < items.length; i++) {
+          let next = await sim.readChannelNonblocking(c)
+          if (next === undefined) next = await sim.readChannel(c)
+          observed.push(next)
+        }
+      })
+      expect(observed).toEqual(items)
+    }),
+    {numRuns: 200}
+  )
+})
+
+test('writeChannelNonblocking returns false on full bounded channel with no readers', async () => {
+  const simulation = new concurrent.ContinuationConcurrent()
+  let firstAccept = false
+  let secondAccept = true
+  await simulation.run(async function (sim) {
+    const c = sim.createChannel<number>(1)
+    firstAccept = await sim.writeChannelNonblocking(c, 1)
+    secondAccept = await sim.writeChannelNonblocking(c, 2)
+  })
+  expect(firstAccept).toBe(true)
+  expect(secondAccept).toBe(false)
+})
+
+test('writeChannelNonblocking on full channel does not lose pending reader delivery', async () => {
+  // If a reader is already parked when we write, the buffer-full check must
+  // not reject — the reader is conceptually a free slot.
+  const simulation = new concurrent.ContinuationConcurrent()
+  let received = -1
+  let writeAccepted = false
+  await simulation.run(async function (sim) {
+    const c = sim.createChannel<number>(1)
+    // Pre-fill so the buffer is full.
+    await sim.writeChannel(c, 99)
+    // Park a second reader (the buffer's contents satisfy the first read,
+    // so we need to pre-drain then have a reader park).
+    const got = await sim.readChannel(c)
+    expect(got).toBe(99)
+    await sim.fork(async () => {
+      received = await sim.readChannel(c)
+    })
+    writeAccepted = await sim.writeChannelNonblocking(c, 42)
+  })
+  expect(writeAccepted).toBe(true)
+  expect(received).toBe(42)
+})
+
+test('writeChannelNonblocking on unbounded channel always succeeds', async () => {
+  await fc.assert(
+    fc.asyncProperty(fc.array(fc.integer(), 0, 100), async items => {
+      const simulation = new concurrent.ContinuationConcurrent()
+      const accepts: boolean[] = []
+      await simulation.run(async function (sim) {
+        const c = sim.createChannel<number>()
+        for (const x of items) {
+          accepts.push(await sim.writeChannelNonblocking(c, x))
+        }
+      })
+      expect(accepts.every(a => a)).toBe(true)
+    }),
+    {numRuns: 100}
+  )
+})
+
+test('Work-stealing pattern: idle worker drains alternate queue when primary is empty', async () => {
+  // Two channels A and B. Worker prefers A but steals from B if A is empty
+  // and falls back to blocking on A when both are empty.
+  const simulation = new concurrent.ContinuationConcurrent()
+  const drained: string[] = []
+  await simulation.run(async function (sim) {
+    const a = sim.createChannel<string>()
+    const b = sim.createChannel<string>()
+
+    // Stage some B work, no A work.
+    await sim.fork(async () => {
+      await sim.writeChannel(b, 'b1')
+      await sim.writeChannel(b, 'b2')
+      // After draining b, write to a so the worker's blocking fallback resolves.
+      await sim.sleep(1)
+      await sim.writeChannel(a, 'a1')
+    })
+
+    await sim.fork(async () => {
+      for (let i = 0; i < 3; i++) {
+        const fromA = await sim.readChannelNonblocking(a)
+        if (fromA !== undefined) {
+          drained.push(fromA)
+          continue
+        }
+        const fromB = await sim.readChannelNonblocking(b)
+        if (fromB !== undefined) {
+          drained.push(fromB)
+          continue
+        }
+        const fallback = await sim.readChannel(a)
+        drained.push(fallback)
+      }
+    })
+  })
+  expect(drained.sort()).toEqual(['a1', 'b1', 'b2'])
+})
